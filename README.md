@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./banner.svg" alt="cors-tester" width="800">
+</div>
+
 # CORS Misconfiguration Tester
 
 A Python scanner designed to evaluate API endpoints for CORS misconfigurations and credentials reflection bugs.
