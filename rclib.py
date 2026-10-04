@@ -14,6 +14,7 @@ import argparse
 import json
 import sys
 import time
+import urllib.parse
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from typing import Any, Callable
@@ -42,6 +43,27 @@ def _c(s, k):
 
 def _sym(unicode_s, ascii_s):
     return unicode_s if _UNICODE_OK else ascii_s
+
+
+def _safe_target(target):
+    try:
+        parsed = urllib.parse.urlsplit(target)
+    except ValueError:
+        return "<redacted target>"
+    if not parsed.scheme or not parsed.netloc:
+        return target
+    try:
+        host = parsed.hostname
+        port = parsed.port
+    except ValueError:
+        return f"{parsed.scheme}://<redacted>"
+    if not host:
+        return f"{parsed.scheme}://<redacted>"
+    if ":" in host:
+        host = f"[{host}]"
+    authority = host if port is None else f"{host}:{port}"
+    query = "[redacted]" if parsed.query else ""
+    return urllib.parse.urlunsplit((parsed.scheme, authority, parsed.path, query, ""))
 
 
 SEV = ("critical", "high", "medium", "low", "info")
@@ -93,7 +115,7 @@ class Context:
 
     def to_json(self):
         return {
-            "tool": self.tool, "target": self.target,
+            "tool": self.tool, "target": _safe_target(self.target),
             "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "findings": [{"title": f.title, "severity": f.severity, "detail": f.detail,
                           "evidence": f.evidence} for f in self.findings],
@@ -122,7 +144,7 @@ def main(tool: str, description: str, run: Callable[[Context], int],
 
     if not args.yes:
         try:
-            ans = input(f"Authorised to test {args.target or 'this host'}? [y/N] ")
+            ans = input(f"Authorised to test {_safe_target(args.target) or 'this host'}? [y/N] ")
         except EOFError:
             ans = "n"
         if ans.strip().lower() not in ("y", "yes"):
@@ -135,7 +157,7 @@ def main(tool: str, description: str, run: Callable[[Context], int],
         dot = _sym("·", "-")
         print(_c(f"{top} {tool}", "bold") + _c(f" {dot} {description}", "d"))
         if args.target:
-            print(_c(f"{bot} target: {args.target}", "d"))
+            print(_c(f"{bot} target: {_safe_target(args.target)}", "d"))
         print()
 
     ctx = Context(args=args, tool=tool, target=args.target or "")

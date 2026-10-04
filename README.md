@@ -2,38 +2,51 @@
   <img src="./banner.svg" alt="cors-tester" width="800">
 </div>
 
-# CORS Misconfiguration Tester
+# CORS Configuration Auditor
 
-A Python scanner designed to evaluate API endpoints for CORS misconfigurations and credentials reflection bugs.
+A small, single-target auditor that records the CORS headers returned by one HTTP
+GET request. Use it only against an endpoint you are authorized to test.
 
-## 📋 Features
+## Features
 
-- **Origin Reflection Check**: Audits whether endpoints dynamically reflect the `Origin` header.
-- **Null Origin Check**: Verifies if `Origin: null` is trusted.
-- **Dynamic Origin with Credentials**: Analyzes whether `Access-Control-Allow-Credentials: true` is shared with dynamically reflected origins.
-- **Subdomain Validation Check**: Audits if trusted domain regex checks can be bypassed using subdomain combinations.
+- Sends one `Origin` header and reports the returned ACAO, ACAC, and `Vary` headers.
+- Uses HTTPS for a bare hostname, verifies TLS certificates, and times out after 10 seconds.
+- Does not follow redirects, so the request stays on the explicitly authorized URL.
+- Does not send cookies, authorization headers, or other credentials.
+- Labels results as observations, not proof of browser access to authenticated data.
 
-## ⚙️ Installation
+The default probe origin is `https://cors-audit.invalid`, a reserved non-resolving
+domain suitable only for observing simple reflection behavior. For a meaningful
+origin-policy check, use an origin that you control and are authorized to use.
+Even a reflected origin with `Access-Control-Allow-Credentials: true` is only a
+potential concern here: this tool does not authenticate, issue browser requests,
+or verify that sensitive response data is readable.
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/amooryx/cors-tester.git
-   cd cors-tester
-   ```
+## Usage
 
-2. Install dependencies:
-   ```bash
-   pip install requests
-   ```
-
-## 🚀 Usage
-
-Scan an endpoint for CORS configurations:
+No third-party packages are required (Python 3.10+).
 
 ```bash
-python main.py -u https://api.target.com/v1/data
+python main.py https://api.example.test/v1/data
 ```
 
-## 🛡️ Disclaimer
+The program prompts for authorization against the target URL before probing. To
+run non-interactively, provide an explicit non-secret authorization context:
 
-This tool is designed for educational and security compliance auditing purposes only. Ensure you have authorized permission prior to running scans against active environments.
+```bash
+python main.py --yes --authorization "approved staging audit" \
+  --origin https://audit.example.test https://api.example.test/v1/data
+```
+
+`--authorization` is not sent to the target or included in JSON output. Avoid
+putting credentials in target URLs; URL user information and query strings are
+redacted from displayed and exported target values. JSON results can be written
+with `-o results.json`.
+
+## Tests
+
+Run the offline test suite with:
+
+```bash
+python -m unittest discover -s tests
+```
